@@ -1,123 +1,121 @@
-window.canvas  = document.getElementById("canvas_main");
-window.context = canvas.getContext("2d");
-window.context.font = "10px Georgia";
+window.canvas_fire   = document.getElementById("canvas_fire");
+window.canvas_water  = document.getElementById("canvas_water");
+window.canvas_grass  = document.getElementById("canvas_grass");
+window.context_fire  =  canvas_fire.getContext("2d");
+window.context_water = canvas_water.getContext("2d");
+window.context_grass = canvas_grass.getContext("2d");
+
 window.fps     = 60;
+window.color_range = 200;
 
 // Create pre-defined color gradient
-window.gradient = [];
+window.gradient_fire  = [];
 {
-  var g1 = jsgradient.generateGradient("#000000", "#FF0000", 33);
-  var g2 = jsgradient.generateGradient("#FF0000", "#FFA500", 33);
-  var g3 = jsgradient.generateGradient("#FFA500", "#FFFFFF", 34);
-  window.gradient = window.gradient.concat(g1, g2, g3);
+  var g1 = jsgradient.generateGradient("#000000", "#FF0000", 65);
+  var g2 = jsgradient.generateGradient("#FF0000", "#FFA500", 45);
+  var g3 = jsgradient.generateGradient("#FFA5FF", "#FFFFFF", 95);
+  window.gradient_fire = window.gradient_fire.concat(g1, g2, g3);
+}
+
+window.gradient_water = [];
+{
+  var g1 = jsgradient.generateGradient("#000000", "#0000FF", 65);
+  var g2 = jsgradient.generateGradient("#0000FF", "#00A5FF", 45);
+  var g3 = jsgradient.generateGradient("#FFA5FF", "#FFFFFF", 95);
+  window.gradient_water = window.gradient_water.concat(g1, g2, g3);
+}
+
+window.gradient_grass = [];
+{
+  var g1 = jsgradient.generateGradient("#000000", "#00FF00", 65);
+  var g2 = jsgradient.generateGradient("#00FF00", "#00FFA5", 45);
+  var g3 = jsgradient.generateGradient("#A5FFA5", "#FFFFFF", 95);
+  window.gradient_grass = window.gradient_grass.concat(g1, g2, g3);
 }
 
 
 // FireCellGrid manager
-function FireCellGrid(fire_size, cell_size) {
+function FireCellGrid(fire_width, fire_height, cell_size) {
   // TODO: initialize constructor
   //    @fire_size: height and width of fire
   //    @cell_size: height and width of cell
 
   // Initialize this.cells with FireCell objects
-  this.cells  = new Array(fire_size);
-  for(var j = 0; j < fire_size; j++) { // Set y
-    this.cells[j] = new Array(fire_size);
-    for(var i = 0; i < fire_size; i++) { // Set x
+  this.cells  = new Array(fire_height + 2);
+  for(var j = 0; j < fire_height + 2; j++) { // Set y
+    this.cells[j] = new Array(fire_width);
+    for(var i = 0; i < fire_width; i++) { // Set x
       this.cells[j][i] = 0;
     }
   }
-  this.fire_size = fire_size;
-  this.cell_size = cell_size;
+
+  this.fire_width  = fire_width;
+  this.fire_height = fire_height;
+  this.cell_size   = cell_size;
 }
 
-FireCellGrid.prototype.drawGrid = function(canvas, context) {
+FireCellGrid.prototype.drawGrid = function(gradient, canvas, context) {
   // wipe canvas... necessary?
-  context.fillStyle = window.gradient[0];
+  context.fillStyle = "#000000";
   context.clearRect(0, 0, canvas.width, canvas.height);
 
-  for(var j = 0; j < this.fire_size; j++) {
-    for(var i = 0; i < this.fire_size; i++) {
+  for(var j = 0; j < this.fire_height; j++) {
+    for(var i = 0; i < this.fire_width; i++) {
       var cell = this.cells[j][i];
-      context.fillStyle = window.gradient[cell];
+      context.fillStyle = gradient[cell];
       context.fillRect(
-        i*this.cell_size,
+        (i-4)*this.cell_size,
         j*this.cell_size,
         this.cell_size,
         this.cell_size
       );
-
-      // Draw cell value
-      //context.fillStyle = "white";
-      //context.fillText(cell, i * this.cell_size, j * this.cell_size);
     }
   }
 }
 
 FireCellGrid.prototype.updateGrid = function() {
   // Iterate, ignoring last row
-  var cell = undefined;
+  var cell  = undefined;
+  var cells = this.cells;
 
-  // Reignite bottom row with new values
-  this.ignite();
+  // Reignite bottom two rows with new values
+  for(var i = 0; i < this.fire_width; i++) {
+    cells[this.fire_height - 2][i] = Math.floor(Math.random() * window.color_range);
+    cells[this.fire_height - 1][i] = Math.floor(Math.random() * window.color_range);
 
-  for(var j = 0; j < this.fire_size - 1; j++) { // SKIP LAST ROW
-    for(var i = 0; i < this.fire_size; i++) {
-      var x_old = this.cells[j][i];
-      this.cells[j][i] = Math.floor((x_old + this.sumBelow(i, j)) / 4);
+    if(i % Math.floor(this.fire_width / 4) == 0) {
+      // define hotspots
+      cells[this.fire_height - 2][i] = window.color_range;
+      cells[this.fire_height - 1][i] = window.color_range;
+    }
+  }
+
+  for(var j = 0; j < this.fire_height - 1; j++) {  // SKIP LAST ROW
+    for(var i = 1; i < this.fire_width - 1; i++) { // SKIP BORDERS
+      cells[j][i] = Math.floor(
+        (cells[j][i] + cells[j+1][i-1] + cells[j+1][i] + cells[j+1][i+1]) / 4
+      );
     }
   }
 }
-
-FireCellGrid.prototype.ignite = function() {
-  // "Light up" bottom row
-  // a.k.a initialize bottom row with values
-  for(var i = 0; i < this.fire_size; i++) {
-    if(i % Math.floor(this.fire_size / 4) == 0) { // add some hotspots
-      this.cells[this.fire_size - 1][i] = 100;
-    } else {
-      this.cells[this.fire_size - 1][i] = Math.floor(Math.random() * 100);
-    }
-  }
-}
-
-FireCellGrid.prototype.sumBelow = function(x, y) {
-  // Get sum of 3 values below this cell
-
-  // If this cell is in the bottom row, return undefined
-  if(y >= this.fire_size - 1) {
-    throw "Cannot average below bottom row.";
-  }
-
-  var retval = 0;
-
-  // push left pixel
-  if(x <= 0) { retval +=0; } // Left border, push 0
-  else { retval += this.cells[y + 1][x - 1]; }
-
-  // push middle pixel
-  if(x <= 0) { retval +=0; }
-  else { retval += this.cells[y + 1][x]; }
-
-  // push right pixel
-  if(x >= this.fire_size - 1) { retval += 0; } // Left border, push 0
-  else { retval += this.cells[y + 1][x + 1]; }
-
-  return retval;
-}
-
 
 // Main logic
-var fire_grid = new FireCellGrid(100, 4);
-fire_grid.updateGrid();
-fire_grid.drawGrid(window.canvas, window.context);
+var fire_grid  = new FireCellGrid(110, 60, 1); // Offset to look prettier
+var water_grid = new FireCellGrid(110, 60, 1); // Offset to look prettier
+var grass_grid = new FireCellGrid(110, 60, 1); // Offset to look prettier
 
 function canvasDraw() {
   setTimeout(
     function timeOut() {
       requestAnimationFrame(canvasDraw);
+
       fire_grid.updateGrid();
-      fire_grid.drawGrid(window.canvas, window.context);
+      water_grid.updateGrid();
+      grass_grid.updateGrid();
+
+      fire_grid.drawGrid( window.gradient_fire,  window.canvas_fire,  window.context_fire);
+      water_grid.drawGrid(window.gradient_water, window.canvas_water, window.context_water);
+      grass_grid.drawGrid(window.gradient_grass, window.canvas_grass, window.context_grass);
     },
     1000 / fps
   );
